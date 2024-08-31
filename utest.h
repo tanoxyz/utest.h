@@ -333,10 +333,17 @@ static UTEST_INLINE utest_int64_t utest_ns(void) {
   utest_large_integer frequency;
   QueryPerformanceCounter(&counter);
   QueryPerformanceFrequency(&frequency);
-  return UTEST_CAST(utest_int64_t,
-                    (counter.QuadPart * 1000000000) / frequency.QuadPart);
+  // This is to preserve the precission (from sokol time)
+  // we need this or otherwise we hit an integer overflow (happens with fsanitize=undefined)
+  int64_t q = UTEST_CAST(utest_int64_t, counter.QuadPart / frequency.QuadPart);
+  int64_t r = UTEST_CAST(utest_int64_t, counter.QuadPart % frequency.QuadPart);
+  return UTEST_CAST(utest_int64_t, q * 1000000000 + (r * 1000000000) / frequency.QuadPart);
 #elif defined(__linux__) && defined(__STRICT_ANSI__)
-  return UTEST_CAST(utest_int64_t, clock()) * 1000000000 / CLOCKS_PER_SEC;
+  // Same as in the windows version, ensure that there is no integer overflow
+  clock_t counter = clock();
+  int64_t q = UTEST_CAST(utest_int64_t, counter / CLOCKS_PER_SEC);
+  int64_t r = UTEST_CAST(utest_int64_t, counter % CLOCKS_PER_SEC);
+  return UTEST_CAST(utest_int64_t, q * 1000000000 + (r * 1000000000) / CLOCKS_PER_SEC);
 #elif defined(__linux__) || defined(__FreeBSD__) || defined(__OpenBSD__) ||    \
     defined(__NetBSD__) || defined(__DragonFly__) || defined(__sun__) ||       \
     defined(__HAIKU__)
